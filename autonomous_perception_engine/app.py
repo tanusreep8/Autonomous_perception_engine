@@ -175,6 +175,6 @@ col3.metric("📡 Mode", "Offline")
 # -------------------------------
 st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
 st.markdown(
-    "<center style='color:#64748b;'>Batch 5 • Autonomous Perception Project</center>",
+    "<center style='color:#64748b;'>🤖 User Friendly Engine</center>",
     unsafe_allow_html=True
 )
