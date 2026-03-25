@@ -2,6 +2,7 @@ import streamlit as st
 import cv2
 import pandas as pd
 import tempfile
+import os
 from utils.detector import detect
 from utils.tracker import Tracker
 
@@ -18,9 +19,6 @@ st.markdown("""
 .stApp {
     background: linear-gradient(135deg, #020617, #0f172a);
     color: white;
-}
-.block-container {
-    padding-top: 1rem;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -48,6 +46,11 @@ metric_unique = col2.empty()
 # PROCESS VIDEO
 # -------------------------------
 if uploaded_file:
+
+    # Create output folder (FIX)
+    os.makedirs("output", exist_ok=True)
+
+    # Save uploaded file temporarily
     tfile = tempfile.NamedTemporaryFile(delete=False)
     tfile.write(uploaded_file.read())
 
@@ -57,11 +60,12 @@ if uploaded_file:
     data = []
     unique_ids = set()
 
-    frame_count = 0  # ⭐ IMPORTANT
+    frame_count = 0
 
-    # Output video
+    # Video Writer (safe)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter("output/output.mp4", fourcc, 20.0, (640, 480))
+    out_path = os.path.join("output", "output.mp4")
+    out = cv2.VideoWriter(out_path, fourcc, 20.0, (640, 480))
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -69,10 +73,6 @@ if uploaded_file:
             break
 
         frame = cv2.resize(frame, (640, 480))
-
-        # -------------------------------
-        # FRAME COUNT
-        # -------------------------------
         frame_count += 1
 
         # -------------------------------
@@ -85,28 +85,33 @@ if uploaded_file:
 
         for i, obj in enumerate(tracked):
             x1, y1, x2, y2, obj_id = obj
-            label = detections[i][4]
+
+            # Safe label access
+            if i < len(detections):
+                label = detections[i][4]
+            else:
+                label = "object"
 
             unique_ids.add(obj_id)
 
             # -------------------------------
-            # STORE DATA (CSV)
+            # STORE DATA
             # -------------------------------
             data.append({
                 "id": obj_id,
                 "label": label,
                 "frame": frame_count,
-                "time": round(frame_count / 20, 2)  # assuming 20 FPS
+                "time": round(frame_count / 20, 2)
             })
 
-            # Draw box
+            # Draw bounding box
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0,255,0), 2)
             cv2.putText(frame, f"{label}-{obj_id}",
                         (x1, y1-10),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.6, (0,255,0), 2)
 
-        # Show video
+        # Display video
         video_placeholder.image(frame, channels="BGR")
 
         # Save frame
@@ -120,15 +125,18 @@ if uploaded_file:
     out.release()
 
     # -------------------------------
-    # SAVE CSV
+    # SAVE CSV (FIXED)
     # -------------------------------
     df = pd.DataFrame(data)
-    df.to_csv("output/data.csv", index=False)
+
+    csv_path = os.path.join("output", "data.csv")
+    df.to_csv(csv_path, index=False)
 
     # -------------------------------
-    # DOWNLOAD VIDEO
+    # DOWNLOAD OUTPUT VIDEO
     # -------------------------------
-    with open("output/output.mp4", "rb") as f:
-        st.download_button("⬇️ Download Output Video", f)
+    if os.path.exists(out_path):
+        with open(out_path, "rb") as f:
+            st.download_button("⬇️ Download Output Video", f)
 
-    st.success("Processing Completed ✅")
+    st.success("✅ Processing Completed Successfully!")
